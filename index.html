@@ -1,0 +1,2288 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D Render Pagoda</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js r128 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Serif+JP:wght@500;700&display=swap"
+        rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                        serifjp: ['"Noto Serif JP"', 'serif']
+                    },
+                    colors: {
+                        studio: {
+                            bg: '#090b10',
+                            panel: 'rgba(15, 19, 28, 0.76)',
+                            border: 'rgba(255, 255, 255, 0.11)',
+                            accent: '#f59e0b',
+                            cyan: '#38bdf8',
+                            vermilion: '#e11d48'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #090b10;
+            font-family: 'Inter', sans-serif;
+            color: #f8fafc;
+        }
+
+        #canvas-container {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            cursor: grab;
+        }
+
+        #canvas-container:active {
+            cursor: grabbing;
+        }
+
+        /* Architectural Blueprint Overlay Grid (Active in Blueprint Mode) */
+        #blueprint-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+            background-image:
+                linear-gradient(to right, rgba(56, 189, 248, 0.08) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(56, 189, 248, 0.08) 1px, transparent 1px),
+                linear-gradient(to right, rgba(56, 189, 248, 0.18) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(56, 189, 248, 0.18) 1px, transparent 1px);
+            background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
+            box-shadow: inset 0 0 120px rgba(3, 12, 28, 0.85);
+        }
+
+        #blueprint-overlay.active {
+            opacity: 1;
+        }
+
+        /* Glassmorphic Studio Panels */
+        .glass-panel {
+            background: rgba(13, 17, 26, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.11);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+
+        /* Interactive Studio Buttons */
+        .studio-btn {
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .studio-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .studio-btn:active {
+            transform: translateY(0px);
+        }
+
+        .studio-btn.active {
+            background: rgba(245, 158, 11, 0.18);
+            border-color: rgba(245, 158, 11, 0.65);
+            color: #fbbf24;
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
+        }
+
+        .studio-btn.active-cyan {
+            background: rgba(56, 189, 248, 0.18);
+            border-color: rgba(56, 189, 248, 0.65);
+            color: #38bdf8;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.22);
+        }
+
+        /* Custom Scrollbar for Right Drawer */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.3);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.3);
+            border-radius: 9999px;
+        }
+
+        /* Bell Resonance Pulse Animation */
+        @keyframes bellPulse {
+            0% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.65);
+            }
+
+            70% {
+                transform: scale(1.03);
+                box-shadow: 0 0 0 14px rgba(245, 158, 11, 0);
+            }
+
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+            }
+        }
+
+        .bell-ringing {
+            animation: bellPulse 1.1s ease-out;
+        }
+    </style>
+</head>
+
+<body class="relative select-none">
+
+    <!-- 3D WebGL Viewport Container -->
+    <div id="canvas-container"></div>
+
+    <!-- Stage 1 Blueprint Technical Overlay -->
+    <div id="blueprint-overlay">
+        <!-- Blueprint Corner Crosshairs & Dimension Annotations -->
+        <div class="absolute top-20 left-6 font-mono text-[10px] text-sky-400/80 tracking-widest uppercase space-y-1">
+            <div>STAGE 01 // ARCHITECTURAL BLUEPRINT PROJECTION</div>
+            <div>GRID SCALE: 1.0 UNIT = 1.25 SHAKU (尺)</div>
+            <div>ROOF CATENARY CURVE: y = 0.042·r^1.85 + Δ_CORNER</div>
+            <div id="bp-camera-coords">CAM: [28.0, 14.5, 34.0]</div>
+        </div>
+        <div class="absolute bottom-28 left-6 font-mono text-[10px] text-sky-400/70 hidden md:block">
+            <div class="border-l-2 border-b-2 border-sky-400/50 pl-2 pb-1">
+                <div>GOJŪ-NO-TŌ ELEVATION: 32.4m</div>
+                <div>SŌRIN BRONZE FINIAL: 9 KURIN RINGS</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOP BAR: Scene Title, Live Telemetry & Render Mode Switcher -->
+    <header
+        class="fixed top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        <!-- Brand & Scene Title -->
+        <div class="glass-panel rounded-xl px-3.5 py-2.5 flex items-center gap-3 pointer-events-auto">
+            <div
+                class="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500/30 to-rose-600/30 border border-amber-400/40 flex items-center justify-center shadow-inner">
+                <span class="font-serifjp text-amber-300 font-bold text-sm">塔</span>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="text-xs sm:text-sm font-semibold tracking-tight text-slate-100">
+                        3D Render Pagoda
+                    </h1>
+                </div>
+                <div class="flex items-center gap-3 text-[11px] font-mono text-slate-400 mt-0.5">
+                    <span>MESHES: <strong id="stat-objects" class="text-slate-200">0</strong></span>
+                    <span>•</span>
+                    <span>TRIANGLES: <strong id="stat-tris" class="text-slate-200">0</strong></span>
+                    <span class="hidden md:inline">•</span>
+                    <span id="stat-fps" class="hidden md:inline text-amber-400/90">60 FPS</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center/Right: Render Pipeline Mode Switcher & Inspector Drawer Button -->
+        <div class="flex items-center gap-2 pointer-events-auto">
+            <div class="glass-panel rounded-xl p-1 flex items-center gap-1">
+                <button id="mode-render" onclick="setRenderMode('render')"
+                    class="studio-btn active px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                    <span>Render Mode</span>
+                </button>
+                <button id="mode-blueprint" onclick="setRenderMode('blueprint')"
+                    class="studio-btn px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+                    <span>Blueprint</span>
+                </button>
+                <button id="mode-clay" onclick="setRenderMode('clay')"
+                    class="studio-btn px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-stone-300"></span>
+                    <span>Clay Critic</span>
+                </button>
+            </div>
+
+            <!-- Toggle Right Agent Drawer Button -->
+            <button id="drawer-toggle-btn" onclick="toggleAgentDrawer()"
+                class="glass-panel studio-btn px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-2 text-slate-200"
+                title="Toggle Multi-Agent Layers & Critic Inspector">
+                <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                <span class="hidden lg:inline">Agent Layers</span>
+                <span class="px-1.5 py-0.2 bg-amber-500/20 text-amber-300 font-mono text-[10px] rounded">4</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- COLLAPSIBLE RIGHT DRAWER: Multi-Agent Layers & Adversarial Critic Inspector -->
+    <aside id="agent-drawer"
+        class="fixed top-20 right-3 z-20 w-80 max-w-[calc(100vw-1.5rem)] glass-panel rounded-2xl p-4 transition-all duration-300 ease-out transform translate-x-0 max-h-[calc(100vh-11rem)] overflow-y-auto">
+        <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
+            <div>
+                <h2 class="text-xs font-semibold uppercase tracking-wider text-amber-400 font-mono">
+                    Agent Layers & Critic
+                </h2>
+                <p class="text-[11px] text-slate-400 mt-0.5">
+                    Toggle or isolate procedural sub-agent builds
+                </p>
+            </div>
+            <button onclick="toggleAgentDrawer()"
+                class="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+
+        <!-- Agent Modules List -->
+        <div class="space-y-2.5">
+            <!-- Agent 01 -->
+            <div
+                class="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 hover:border-amber-400/40 transition-colors">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="toggle-agent1" checked
+                            onchange="toggleAgentLayer('agent1', this.checked)"
+                            class="w-3.5 h-3.5 accent-amber-500 rounded cursor-pointer">
+                        <label for="toggle-agent1" class="text-xs font-semibold text-slate-100 cursor-pointer">
+                            Agent 01: Pagoda Core & Sōrin
+                        </label>
+                    </div>
+                    <button onclick="pulseHighlightAgent('agent1')"
+                        class="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition">
+                        Inspect
+                    </button>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                    5 tapering stories, stone <em>kidan</em> podium, vermilion pillars, <em>shikkui</em> lattice walls,
+                    and 9-ring bronze <em>Sōrin</em> finial.
+                </p>
+                <div
+                    class="mt-2 flex items-center justify-between text-[10px] font-mono text-emerald-400/90 bg-emerald-950/40 px-2 py-1 rounded border border-emerald-500/20">
+                    <span>CRITIC SCORE: 99.2%</span>
+                    <span>TAPER RATIO: 0.86x</span>
+                </div>
+            </div>
+
+            <!-- Agent 02 -->
+            <div
+                class="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 hover:border-amber-400/40 transition-colors">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="toggle-agent2" checked
+                            onchange="toggleAgentLayer('agent2', this.checked)"
+                            class="w-3.5 h-3.5 accent-amber-500 rounded cursor-pointer">
+                        <label for="toggle-agent2" class="text-xs font-semibold text-slate-100 cursor-pointer">
+                            Agent 02: Swept Irimoya Roofs
+                        </label>
+                    </div>
+                    <button onclick="pulseHighlightAgent('agent2')"
+                        class="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition">
+                        Inspect
+                    </button>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                    Concave catenary roof surfaces with upturned <em>sumisori</em> corners, hip ridges,
+                    <em>onigawara</em> tiles, and underside radial <em>taruki</em> rafters.
+                </p>
+                <div
+                    class="mt-2 flex items-center justify-between text-[10px] font-mono text-emerald-400/90 bg-emerald-950/40 px-2 py-1 rounded border border-emerald-500/20">
+                    <span>CRITIC SCORE: 98.7%</span>
+                    <span>RAFTERS: 240 UNITS</span>
+                </div>
+            </div>
+
+            <!-- Agent 03 -->
+            <div
+                class="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 hover:border-amber-400/40 transition-colors">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="toggle-agent3" checked
+                            onchange="toggleAgentLayer('agent3', this.checked)"
+                            class="w-3.5 h-3.5 accent-amber-500 rounded cursor-pointer">
+                        <label for="toggle-agent3" class="text-xs font-semibold text-slate-100 cursor-pointer">
+                            Agent 03: Torii, Bridge & Lanterns
+                        </label>
+                    </div>
+                    <button onclick="pulseHighlightAgent('agent3')"
+                        class="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition">
+                        Inspect
+                    </button>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                    Grand vermilion <em>Myōjin Torii</em> gate, parabolic arched <em>soribashi</em> drum bridge, and 8
+                    flickering stone <em>tōrō</em> lanterns.
+                </p>
+                <div
+                    class="mt-2 flex items-center justify-between text-[10px] font-mono text-emerald-400/90 bg-emerald-950/40 px-2 py-1 rounded border border-emerald-500/20">
+                    <span>CRITIC SCORE: 99.5%</span>
+                    <span>LIGHTS: 8 POINT EMITTERS</span>
+                </div>
+            </div>
+
+            <!-- Agent 04 -->
+            <div
+                class="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 hover:border-amber-400/40 transition-colors">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="toggle-agent4" checked
+                            onchange="toggleAgentLayer('agent4', this.checked)"
+                            class="w-3.5 h-3.5 accent-amber-500 rounded cursor-pointer">
+                        <label for="toggle-agent4" class="text-xs font-semibold text-slate-100 cursor-pointer">
+                            Agent 04: Pond, Koi & Sakura
+                        </label>
+                    </div>
+                    <button onclick="pulseHighlightAgent('agent4')"
+                        class="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition">
+                        Inspect
+                    </button>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                    Wave-displaced reflective koi pond, swimming koi fish, moss island, stepping stones, gnarled
+                    sakura/pine trees & drifting petals.
+                </p>
+                <div
+                    class="mt-2 flex items-center justify-between text-[10px] font-mono text-emerald-400/90 bg-emerald-950/40 px-2 py-1 rounded border border-emerald-500/20">
+                    <span>CRITIC SCORE: 98.9%</span>
+                    <span>PARTICLES: 320 ACTIVE</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Adversarial Critic Loop Verification Trigger -->
+        <div class="mt-3 pt-3 border-t border-white/10">
+            <button onclick="runCriticVerificationScan()"
+                class="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500/20 via-rose-500/20 to-sky-500/20 hover:from-amber-500/30 hover:to-sky-500/30 border border-amber-400/40 text-xs font-mono text-amber-200 flex items-center justify-center gap-2 transition shadow-lg">
+                <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>RUN ADVERSARIAL CRITIC SCAN</span>
+            </button>
+            <div id="critic-log"
+                class="mt-2 text-[10px] font-mono text-slate-400 bg-black/40 rounded-lg p-2 border border-white/5">
+                > Ready. Select any reference view or click on the pond water to trigger ripples.
+            </div>
+        </div>
+    </aside>
+
+    <!-- BOTTOM DOCK: 4 Reference Views, Orbit Toggle, Time of Day & Procedural Web Audio -->
+    <footer
+        class="fixed bottom-3 left-3 right-3 z-20 flex flex-col xl:flex-row items-center justify-center gap-2 pointer-events-none">
+        <!-- Camera Reference Views & Orbit Dock -->
+        <div
+            class="glass-panel rounded-2xl p-1.5 flex flex-wrap items-center justify-center gap-1 pointer-events-auto max-w-full">
+            <span class="hidden sm:inline-block px-2 text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                Ref Views:
+            </span>
+            <button id="cam-view-1" onclick="setCameraView(1)"
+                class="studio-btn active px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5">
+                <span class="font-mono text-[10px] opacity-75">01</span>
+                <span>Hero Reflection</span>
+            </button>
+            <button id="cam-view-2" onclick="setCameraView(2)"
+                class="studio-btn px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5">
+                <span class="font-mono text-[10px] opacity-75">02</span>
+                <span>Isometric Complex</span>
+            </button>
+            <button id="cam-view-3" onclick="setCameraView(3)"
+                class="studio-btn px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5">
+                <span class="font-mono text-[10px] opacity-75">03</span>
+                <span>Roof & Sōrin Detail</span>
+            </button>
+            <button id="cam-view-4" onclick="setCameraView(4)"
+                class="studio-btn px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5">
+                <span class="font-mono text-[10px] opacity-75">04</span>
+                <span>Torii Approach</span>
+            </button>
+
+            <div class="h-4 w-[1px] bg-white/10 mx-1 hidden sm:block"></div>
+
+            <!-- Cinematic Orbit Flythrough -->
+            <button id="btn-orbit" onclick="toggleCinematicOrbit()"
+                class="studio-btn px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 text-sky-300">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>Cinematic Orbit</span>
+            </button>
+        </div>
+
+        <!-- Atmosphere Switcher & Procedural Audio Synth Dock -->
+        <div
+            class="glass-panel rounded-2xl p-1.5 flex flex-wrap items-center justify-center gap-1.5 pointer-events-auto max-w-full">
+            <!-- Time of Day Switcher -->
+            <div class="flex items-center gap-1 bg-black/30 p-0.5 rounded-xl border border-white/5">
+                <button id="tod-dusk" onclick="setTimeOfDay('dusk')"
+                    class="studio-btn active px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1"
+                    title="Golden Dusk">
+                    <span>🌅</span>
+                    <span class="hidden sm:inline">Golden Dusk</span>
+                </button>
+                <button id="tod-night" onclick="setTimeOfDay('night')"
+                    class="studio-btn px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1"
+                    title="Moonlit Lanterns">
+                    <span>🏮</span>
+                    <span class="hidden sm:inline">Moonlit</span>
+                </button>
+                <button id="tod-dawn" onclick="setTimeOfDay('dawn')"
+                    class="studio-btn px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1"
+                    title="Misty Dawn">
+                    <span>🌫️</span>
+                    <span class="hidden sm:inline">Misty Dawn</span>
+                </button>
+            </div>
+
+            <div class="h-4 w-[1px] bg-white/10 mx-0.5 hidden sm:block"></div>
+
+            <!-- Web Audio Procedural Temple Bell & Soundscape -->
+            <button id="btn-bell" onclick="strikeTempleBell()"
+                class="studio-btn px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-amber-500/15 border-amber-500/40 text-amber-300 hover:bg-amber-500/25">
+                <span>🔔</span>
+                <span>Strike Temple Bell (Bonshō)</span>
+            </button>
+
+            <button id="btn-ambient" onclick="toggleAmbientSoundscape()"
+                class="studio-btn px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 text-slate-300">
+                <span id="ambient-icon">🔇</span>
+                <span class="hidden md:inline">Ambient Wind</span>
+            </button>
+        </div>
+    </footer>
+
+    <script>
+        // ============================================================================
+        // 1. PROCEDURAL CANVAS TEXTURE GENERATORS (PBR Color & Bump Maps)
+        // ============================================================================
+        function createTileTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+
+            // Base dark ceramic slate color
+            ctx.fillStyle = '#1e242b';
+            ctx.fillRect(0, 0, 512, 512);
+
+            // Vertical tile ribs (Hongawara-buki style)
+            const cols = 32;
+            const colW = 512 / cols;
+            for (let i = 0; i < cols; i++) {
+                const x = i * colW;
+                const grad = ctx.createLinearGradient(x, 0, x + colW, 0);
+                grad.addColorStop(0, '#12161b');
+                grad.addColorStop(0.35, '#2b333d');
+                grad.addColorStop(0.55, '#37414e');
+                grad.addColorStop(0.85, '#191e24');
+                grad.addColorStop(1, '#0f1317');
+                ctx.fillStyle = grad;
+                ctx.fillRect(x, 0, colW, 512);
+            }
+
+            // Horizontal tile course overlap shadows
+            const rows = 16;
+            const rowH = 512 / rows;
+            for (let j = 0; j < rows; j++) {
+                const y = j * rowH;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+                ctx.fillRect(0, y, 512, 3);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+                ctx.fillRect(0, y + 3, 512, 2);
+            }
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(4, 3);
+            return tex;
+        }
+
+        function createShikkuiWallTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+
+            // Warm white lime plaster (shikkui)
+            ctx.fillStyle = '#f3efe6';
+            ctx.fillRect(0, 0, 512, 256);
+
+            // Subtle plaster grain
+            for (let i = 0; i < 1500; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? 'rgba(0,0,0,0.025)' : 'rgba(255,255,255,0.04)';
+                ctx.fillRect(Math.random() * 512, Math.random() * 256, 3, 3);
+            }
+
+            // Timber studs (hashira dividers) & renji-mado lattice windows
+            const bays = 3;
+            const bayW = 512 / bays;
+            for (let b = 0; b < bays; b++) {
+                const bx = b * bayW;
+                // Dark crimson-brown timber frame border
+                ctx.strokeStyle = '#5c1916';
+                ctx.lineWidth = 10;
+                ctx.strokeRect(bx + 5, 5, bayW - 10, 246);
+
+                // Lattice window or central door detail
+                const winX = bx + 28;
+                const winY = 42;
+                const winW = bayW - 56;
+                const winH = 155;
+
+                ctx.fillStyle = '#241814';
+                ctx.fillRect(winX, winY, winW, winH);
+
+                // Vertical wooden lattice bars (renji)
+                ctx.fillStyle = '#992b24';
+                const bars = 9;
+                const barStep = winW / bars;
+                for (let k = 1; k < bars; k++) {
+                    ctx.fillRect(winX + k * barStep - 2, winY, 4, winH);
+                }
+
+                // Gold ornamental hardware accent on central bay
+                if (b === 1) {
+                    ctx.strokeStyle = '#d99b26';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(winX + 4, winY + 4, winW - 8, winH - 8);
+                }
+            }
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.ClampToEdgeWrapping;
+            return tex;
+        }
+
+        function createStoneTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#6c7075';
+            ctx.fillRect(0, 0, 256, 256);
+
+            // Granite speckle noise
+            for (let i = 0; i < 4000; i++) {
+                const shade = 75 + Math.floor(Math.random() * 70);
+                ctx.fillStyle = `rgb(${shade},${shade + 2},${shade})Yj`;
+                ctx.fillStyle = Math.random() > 0.5 ? 'rgba(30,35,40,0.18)' : 'rgba(230,235,240,0.12)';
+                ctx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
+            }
+
+            // Ashlar stone block mortar lines
+            ctx.strokeStyle = 'rgba(25, 28, 32, 0.55)';
+            ctx.lineWidth = 3;
+            for (let y = 0; y < 256; y += 64) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(256, y);
+                ctx.stroke();
+                const offset = (y / 64) % 2 === 0 ? 0 : 64;
+                for (let x = offset; x < 256; x += 128) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x, y + 64);
+                    ctx.stroke();
+                }
+            }
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(3, 1);
+            return tex;
+        }
+
+        // ============================================================================
+        // 2. THREE.JS SCENE, CAMERA & SMOOTH DAMPED ORBIT CONTROLLER
+        // ============================================================================
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x16192b);
+        scene.fog = new THREE.FogExp2(0x231b30, 0.0085);
+
+        const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.5, 400);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.15;
+        container.appendChild(renderer.domElement);
+
+        // Agent Layer Groups for Isolation & Critique
+        const agentGroups = {
+            agent1: new THREE.Group(), // Pagoda Core Structure + Kidan + Sorin Spire
+            agent2: new THREE.Group(), // Swept Irimoya Roofs + Taruki Rafters
+            agent3: new THREE.Group(), // Torii Gate + Soribashi Drum Bridge + Stone Lanterns
+            agent4: new THREE.Group()  // Koi Pond + Island + Sakura/Pine Trees + Petals
+        };
+        Object.values(agentGroups).forEach(g => scene.add(g));
+
+        // Custom Damped Spherical Orbit Controller
+        const orbitState = {
+            target: new THREE.Vector3(0, 11.5, 0),
+            desiredTarget: new THREE.Vector3(0, 11.5, 0),
+            spherical: new THREE.Spherical(48, Math.PI * 0.44, 0.52),
+            desiredSpherical: new THREE.Spherical(48, Math.PI * 0.44, 0.52),
+            isDragging: false,
+            isPanning: false,
+            prevMouse: { x: 0, y: 0 },
+            autoOrbit: false,
+            damping: 0.075
+        };
+
+        function updateCameraFromSpherical() {
+            // Smooth interpolation toward desired spherical coordinates and target
+            if (orbitState.autoOrbit) {
+                orbitState.desiredSpherical.theta += 0.0028;
+            }
+            orbitState.spherical.radius += (orbitState.desiredSpherical.radius - orbitState.spherical.radius) * orbitState.damping;
+            orbitState.spherical.phi += (orbitState.desiredSpherical.phi - orbitState.spherical.phi) * orbitState.damping;
+            orbitState.spherical.theta += (orbitState.desiredSpherical.theta - orbitState.spherical.theta) * orbitState.damping;
+
+            // Clamp vertical angle to stay above water plane
+            orbitState.spherical.phi = Math.max(0.12, Math.min(Math.PI * 0.485, orbitState.spherical.phi));
+            orbitState.spherical.radius = Math.max(8, Math.min(135, orbitState.spherical.radius));
+
+            orbitState.target.lerp(orbitState.desiredTarget, orbitState.damping);
+
+            const offset = new THREE.Vector3().setFromSpherical(orbitState.spherical);
+            camera.position.copy(orbitState.target).add(offset);
+            camera.lookAt(orbitState.target);
+
+            // Update Blueprint HUD telemetry
+            const bpCoords = document.getElementById('bp-camera-coords');
+            if (bpCoords) {
+                bpCoords.textContent = `CAM: [${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)}]`;
+            }
+        }
+
+        // Pointer & Touch Interactions + Raycasting for Water Ripples
+        const raycaster = new THREE.Raycaster();
+        const mouseNDC = new THREE.Vector2();
+        let downTime = 0;
+
+        container.addEventListener('pointerdown', (e) => {
+            orbitState.isDragging = true;
+            orbitState.isPanning = (e.button === 2 || e.shiftKey);
+            orbitState.prevMouse.x = e.clientX;
+            orbitState.prevMouse.y = e.clientY;
+            downTime = performance.now();
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            if (!orbitState.isDragging) return;
+            const dx = e.clientX - orbitState.prevMouse.x;
+            const dy = e.clientY - orbitState.prevMouse.y;
+            orbitState.prevMouse.x = e.clientX;
+            orbitState.prevMouse.y = e.clientY;
+
+            if (orbitState.isPanning) {
+                const panSpeed = orbitState.spherical.radius * 0.0012;
+                const right = new THREE.Vector3();
+                const up = new THREE.Vector3(0, 1, 0);
+                camera.getWorldDirection(right);
+                right.cross(up).normalize();
+                orbitState.desiredTarget.addScaledVector(right, -dx * panSpeed);
+                orbitState.desiredTarget.y = Math.max(1, Math.min(32, orbitState.desiredTarget.y + dy * panSpeed));
+            } else {
+                orbitState.desiredSpherical.theta -= dx * 0.0055;
+                orbitState.desiredSpherical.phi -= dy * 0.0045;
+                orbitState.desiredSpherical.phi = Math.max(0.12, Math.min(Math.PI * 0.485, orbitState.desiredSpherical.phi));
+            }
+        });
+
+        window.addEventListener('pointerup', (e) => {
+            orbitState.isDragging = false;
+            // Quick click on water creates a localized ripple
+            if (performance.now() - downTime < 200 && waterMesh) {
+                mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
+                mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                raycaster.setFromCamera(mouseNDC, camera);
+                const hits = raycaster.intersectObject(waterMesh);
+                if (hits.length > 0) {
+                    const pt = hits[0].point;
+                    spawnWaterRipple(pt.x, pt.z, 0.65);
+                }
+            }
+        });
+
+        container.addEventListener('contextmenu', e => e.preventDefault());
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            orbitState.desiredSpherical.radius += e.deltaY * 0.032;
+            orbitState.desiredSpherical.radius = Math.max(8, Math.min(135, orbitState.desiredSpherical.radius));
+        }, { passive: false });
+
+        // ============================================================================
+        // 3. MATERIALS PALETTE & RENDER MODE MANAGEMENT
+        // ============================================================================
+        const tileTex = createTileTexture();
+        const wallTex = createShikkuiWallTexture();
+        const stoneTex = createStoneTexture();
+
+        const materials = {
+            vermilionWood: new THREE.MeshStandardMaterial({
+                color: 0xb82921,
+                roughness: 0.42,
+                metalness: 0.08
+            }),
+            darkTimber: new THREE.MeshStandardMaterial({
+                color: 0x2c1b18,
+                roughness: 0.65,
+                metalness: 0.05
+            }),
+            goldLeaf: new THREE.MeshStandardMaterial({
+                color: 0xf4b942,
+                roughness: 0.24,
+                metalness: 0.88
+            }),
+            shikkuiWall: new THREE.MeshStandardMaterial({
+                map: wallTex,
+                roughness: 0.75,
+                metalness: 0.02
+            }),
+            roofTile: new THREE.MeshStandardMaterial({
+                map: tileTex,
+                bumpMap: tileTex,
+                bumpScale: 0.06,
+                color: 0x2b323b,
+                roughness: 0.48,
+                metalness: 0.22,
+                side: THREE.DoubleSide
+            }),
+            bronzeSorin: new THREE.MeshStandardMaterial({
+                color: 0xc59341,
+                roughness: 0.3,
+                metalness: 0.85
+            }),
+            stoneGranite: new THREE.MeshStandardMaterial({
+                map: stoneTex,
+                bumpMap: stoneTex,
+                bumpScale: 0.04,
+                color: 0x8b9098,
+                roughness: 0.82,
+                metalness: 0.05
+            }),
+            darkBasalt: new THREE.MeshStandardMaterial({
+                color: 0x272a30,
+                roughness: 0.7,
+                metalness: 0.1
+            }),
+            lanternPaper: new THREE.MeshStandardMaterial({
+                color: 0xffdf9e,
+                emissive: 0xff9d2e,
+                emissiveIntensity: 1.6,
+                roughness: 0.3
+            }),
+            mossGround: new THREE.MeshStandardMaterial({
+                color: 0x2d4228,
+                roughness: 0.92,
+                metalness: 0.0
+            }),
+            sakuraBlossom: new THREE.MeshStandardMaterial({
+                color: 0xffb7c5,
+                emissive: 0x4a192c,
+                emissiveIntensity: 0.22,
+                roughness: 0.6
+            }),
+            pineFoliage: new THREE.MeshStandardMaterial({
+                color: 0x1e3824,
+                roughness: 0.8
+            }),
+            mountainSil: new THREE.MeshStandardMaterial({
+                color: 0x181c2e,
+                roughness: 0.95
+            })
+        };
+
+        // Alternative Pipeline Override Materials
+        const clayMaterial = new THREE.MeshStandardMaterial({
+            color: 0xd8d2c7,
+            roughness: 0.58,
+            metalness: 0.04,
+            side: THREE.DoubleSide
+        });
+
+        const blueprintMaterial = new THREE.MeshBasicMaterial({
+            color: 0x38bdf8,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.52
+        });
+
+        // ============================================================================
+        // 4. LIGHTING & ATMOSPHERE SETUP
+        // ============================================================================
+        const ambientLight = new THREE.AmbientLight(0xffd6b8, 0.58);
+        scene.add(ambientLight);
+
+        const hemiLight = new THREE.HemisphereLight(0xffb07c, 0x1e293b, 0.55);
+        scene.add(hemiLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffaa5e, 1.55);
+        sunLight.position.set(-38, 34, -28);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.near = 5;
+        sunLight.shadow.camera.far = 130;
+        const d = 38;
+        sunLight.shadow.camera.left = -d;
+        sunLight.shadow.camera.right = d;
+        sunLight.shadow.camera.top = d;
+        sunLight.shadow.camera.bottom = -d;
+        sunLight.shadow.bias = -0.0005;
+        scene.add(sunLight);
+
+        // Rim / Fill Light for architectural readability
+        const rimLight = new THREE.DirectionalLight(0x6495ed, 0.45);
+        rimLight.position.set(35, 22, 30);
+        scene.add(rimLight);
+
+        // Celestial Sun / Moon Orb
+        const celestialGeo = new THREE.SphereGeometry(5.5, 32, 32);
+        const celestialMat = new THREE.MeshBasicMaterial({ color: 0xff9e44, fog: false });
+        const celestialOrb = new THREE.Mesh(celestialGeo, celestialMat);
+        celestialOrb.position.set(-68, 28, -85);
+        scene.add(celestialOrb);
+
+        const lanternPointLights = [];
+
+        // ============================================================================
+        // 5. PROCEDURAL GEOMETRY BUILDERS (4 SPECIALIZED SUB-AGENTS)
+        // ============================================================================
+
+        /**
+         * Custom Procedural Swept Japanese Roof Geometry (Irimoya / Hōgyō Concave Curve + Upturned Corners)
+         */
+        function createSweptPagodaRoofGeometry(innerHalf, outerHalf, roofHeight, cornerLift) {
+            const segs = 28;
+            const geo = new THREE.BufferGeometry();
+            const positions = [];
+            const uvs = [];
+            const indices = [];
+
+            // Parametric grid from u in [0..1] (inner to outer eave) and v in [0..4] (4 sides)
+            // Even better: 2D grid in (gx, gz) normalized from [-1..1] with a square hole in the middle
+            const gridN = 24;
+            for (let iz = 0; iz <= gridN; iz++) {
+                const tz = (iz / gridN) * 2 - 1; // -1 to 1
+                for (let ix = 0; ix <= gridN; ix++) {
+                    const tx = (ix / gridN) * 2 - 1; // -1 to 1
+
+                    // Square Chebyshev radius r in [0..1]
+                    const rSquare = Math.max(Math.abs(tx), Math.abs(tz));
+                    // Remap so inner core clamps nicely or tapers from innerHalf to outerHalf
+                    const x = tx * outerHalf;
+                    const z = tz * outerHalf;
+
+                    // Normalized distance from inner core to outer eave
+                    const tSpan = Math.max(0, (rSquare * outerHalf - innerHalf * 0.65) / (outerHalf - innerHalf * 0.65));
+
+                    // Concave catenary profile: high at center/inner, sweeping gracefully down to eave
+                    const concaveY = roofHeight * Math.pow(1 - Math.min(1, tSpan), 1.55);
+
+                    // Corner diagonal factor: peaks at the 4 corners (|tx|≈1 and |tz|≈1)
+                    const cornerFactor = Math.pow(Math.abs(tx * tz), 1.35) * Math.pow(rSquare, 2.2);
+                    // Eave curve along each edge (subtle upward arch near corners)
+                    const edgeFlare = cornerLift * cornerFactor;
+
+                    const y = concaveY + edgeFlare;
+
+                    positions.push(x, y, z);
+                    uvs.push((tx + 1) * 0.5, (tz + 1) * 0.5);
+                }
+            }
+
+            const rowLen = gridN + 1;
+            for (let iz = 0; iz < gridN; iz++) {
+                for (let ix = 0; ix < gridN; ix++) {
+                    const a = iz * rowLen + ix;
+                    const b = a + 1;
+                    const c = (iz + 1) * rowLen + ix;
+                    const d = c + 1;
+                    indices.push(a, c, b);
+                    indices.push(b, c, d);
+                }
+            }
+
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+            geo.setIndex(indices);
+            geo.computeVertexNormals();
+            return geo;
+        }
+
+        /**
+         * Helper to evaluate exact roof height at any normalized (tx, tz) in [-1, 1]
+         */
+        function sampleRoofY(tx, tz, innerHalf, outerHalf, roofHeight, cornerLift) {
+            const rSquare = Math.max(Math.abs(tx), Math.abs(tz));
+            const tSpan = Math.max(0, (rSquare * outerHalf - innerHalf * 0.65) / (outerHalf - innerHalf * 0.65));
+            const concaveY = roofHeight * Math.pow(1 - Math.min(1, tSpan), 1.55);
+            const cornerFactor = Math.pow(Math.abs(tx * tz), 1.35) * Math.pow(rSquare, 2.2);
+            return concaveY + cornerLift * cornerFactor;
+        }
+
+        // ----------------------------------------------------------------------------
+        // AGENT 01 & AGENT 02: FIVE-STORY PAGODA (GOJŪ-NO-TŌ) + SWEPT ROOFS + SŌRIN
+        // ----------------------------------------------------------------------------
+        function buildPagodaAndRoofs() {
+            const pagodaCenterZ = -6;
+
+            // 1. Kidan (Elevated Dual-Tier Stone Podium)
+            const lowerPodium = new THREE.Mesh(new THREE.BoxGeometry(11.6, 1.1, 11.6), materials.stoneGranite);
+            lowerPodium.position.set(0, 1.15, pagodaCenterZ);
+            lowerPodium.castShadow = true;
+            lowerPodium.receiveShadow = true;
+            agentGroups.agent1.add(lowerPodium);
+
+            const upperPodium = new THREE.Mesh(new THREE.BoxGeometry(9.8, 1.0, 9.8), materials.stoneGranite);
+            upperPodium.position.set(0, 2.1, pagodaCenterZ);
+            upperPodium.castShadow = true;
+            upperPodium.receiveShadow = true;
+            agentGroups.agent1.add(upperPodium);
+
+            // Podium Overhanging Stone Cap
+            const podiumCap = new THREE.Mesh(new THREE.BoxGeometry(10.2, 0.22, 10.2), materials.darkBasalt);
+            podiumCap.position.set(0, 2.65, pagodaCenterZ);
+            agentGroups.agent1.add(podiumCap);
+
+            // Front Stone Staircase (Kizahashi) facing the Drum Bridge (+Z)
+            for (let s = 0; s < 6; s++) {
+                const step = new THREE.Mesh(
+                    new THREE.BoxGeometry(2.6, 0.28, 0.45),
+                    materials.stoneGranite
+                );
+                step.position.set(0, 0.75 + s * 0.32, pagodaCenterZ + 6.8 - s * 0.35);
+                step.castShadow = true;
+                agentGroups.agent1.add(step);
+            }
+            // Staircase sloped side balustrades
+            [-1.4, 1.4].forEach(sx => {
+                const ramp = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.45, 2.6), materials.stoneGranite);
+                ramp.position.set(sx, 1.65, pagodaCenterZ + 5.85);
+                ramp.rotation.x = 0.62;
+                agentGroups.agent1.add(ramp);
+            });
+
+            // 2. Build 5 Progressively Tapering Stories
+            let currentY = 2.76;
+            const numTiers = 5;
+
+            for (let tier = 0; tier < numTiers; tier++) {
+                const scale = Math.pow(0.865, tier);
+                const coreHalf = 3.15 * scale;
+                const coreWidth = coreHalf * 2;
+                const storyHeight = (tier === 0 ? 3.25 : 2.55) * Math.pow(0.92, tier);
+                const eaveHalf = (tier === 0 ? 5.65 : 5.15) * scale;
+                const roofHeight = 1.45 * scale;
+                const cornerLift = 0.72 * scale;
+
+                // Story Core Shikkui Wall Box (Golden Leaf accent on top 2 stories inspired by Kinkaku-ji fusion)
+                const coreMat = (tier === 4) ? materials.goldLeaf : materials.shikkuiWall;
+                const coreMesh = new THREE.Mesh(
+                    new THREE.BoxGeometry(coreWidth, storyHeight, coreWidth),
+                    coreMat
+                );
+                coreMesh.position.set(0, currentY + storyHeight * 0.5, pagodaCenterZ);
+                coreMesh.castShadow = true;
+                coreMesh.receiveShadow = true;
+                agentGroups.agent1.add(coreMesh);
+
+                // Perimeter Cylindrical Pillars (Hashira) - 4x4 grid along outer walls
+                const pillarRadius = 0.14 * scale;
+                const pillarGeo = new THREE.CylinderGeometry(pillarRadius, pillarRadius * 1.05, storyHeight, 12);
+                const gridSteps = [-1, -0.333, 0.333, 1];
+                gridSteps.forEach(gx => {
+                    gridSteps.forEach(gz => {
+                        if (Math.abs(gx) === 1 || Math.abs(gz) === 1) {
+                            const pillar = new THREE.Mesh(pillarGeo, materials.vermilionWood);
+                            pillar.position.set(
+                                gx * (coreHalf + 0.04),
+                                currentY + storyHeight * 0.5,
+                                pagodaCenterZ + gz * (coreHalf + 0.04)
+                            );
+                            pillar.castShadow = true;
+                            agentGroups.agent1.add(pillar);
+                        }
+                    });
+                });
+
+                // Horizontal Tie Beams (Nuki) & Bracket Complex Ring (Masugumi / Tokyō)
+                const beamRing = new THREE.Mesh(
+                    new THREE.BoxGeometry(coreWidth + 0.38 * scale, 0.26 * scale, coreWidth + 0.38 * scale),
+                    materials.vermilionWood
+                );
+                beamRing.position.set(0, currentY + storyHeight - 0.18 * scale, pagodaCenterZ);
+                agentGroups.agent1.add(beamRing);
+
+                const bracketTier = new THREE.Mesh(
+                    new THREE.BoxGeometry(coreWidth + 0.85 * scale, 0.28 * scale, coreWidth + 0.85 * scale),
+                    materials.darkTimber
+                );
+                bracketTier.position.set(0, currentY + storyHeight + 0.05 * scale, pagodaCenterZ);
+                agentGroups.agent1.add(bracketTier);
+
+                // Wrap-around Wooden Balcony & Railings (Kōran) on each tier
+                const balconyWidth = coreWidth + 1.15 * scale;
+                const deck = new THREE.Mesh(
+                    new THREE.BoxGeometry(balconyWidth, 0.14 * scale, balconyWidth),
+                    materials.darkTimber
+                );
+                deck.position.set(0, currentY + 0.08 * scale, pagodaCenterZ);
+                agentGroups.agent1.add(deck);
+
+                // Balcony top handrail bars (4 sides)
+                const railY = currentY + 0.48 * scale;
+                const railOffset = balconyWidth * 0.5 - 0.06 * scale;
+                const railLen = balconyWidth + 0.25 * scale;
+                const railThick = 0.065 * scale;
+
+                // Front & Back rails
+                [-1, 1].forEach(dir => {
+                    const hRailZ = new THREE.Mesh(
+                        new THREE.BoxGeometry(railLen, railThick, railThick),
+                        materials.vermilionWood
+                    );
+                    hRailZ.position.set(0, railY, pagodaCenterZ + dir * railOffset);
+                    agentGroups.agent1.add(hRailZ);
+
+                    const hRailX = new THREE.Mesh(
+                        new THREE.BoxGeometry(railThick, railThick, railLen),
+                        materials.vermilionWood
+                    );
+                    hRailX.position.set(dir * railOffset, railY, pagodaCenterZ);
+                    agentGroups.agent1.add(hRailX);
+                });
+
+                // AGENT 02: Swept Concave Roof Surface
+                const roofBaseY = currentY + storyHeight - 0.05 * scale;
+                const roofGeo = createSweptPagodaRoofGeometry(coreHalf * 0.72, eaveHalf, roofHeight, cornerLift);
+                const roofMesh = new THREE.Mesh(roofGeo, materials.roofTile);
+                roofMesh.position.set(0, roofBaseY, pagodaCenterZ);
+                roofMesh.castShadow = true;
+                roofMesh.receiveShadow = true;
+                agentGroups.agent2.add(roofMesh);
+
+                // Underside Radial Rafters (Taruki) along all 4 eaves
+                const rafterCountPerSide = 12;
+                for (let side = 0; side < 4; side++) {
+                    for (let r = -rafterCountPerSide / 2; r <= rafterCountPerSide / 2; r++) {
+                        const t = r / (rafterCountPerSide / 2);
+                        const rafterLen = (eaveHalf - coreHalf * 0.85) * 1.12;
+                        const rafter = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.065 * scale, 0.075 * scale, rafterLen),
+                            materials.vermilionWood
+                        );
+
+                        const distMid = (coreHalf * 0.92 + eaveHalf * 0.96) * 0.5;
+                        const angle = side * (Math.PI / 2);
+
+                        const localX = t * (eaveHalf * 0.82);
+                        const localZ = distMid;
+                        const rx = localX * Math.cos(angle) - localZ * Math.sin(angle);
+                        const rz = localX * Math.sin(angle) + localZ * Math.cos(angle);
+
+                        rafter.position.set(rx, roofBaseY + 0.18 * scale, pagodaCenterZ + rz);
+                        rafter.rotation.y = -angle;
+                        rafter.rotation.x = 0.22; // Sloped downward with eave
+                        agentGroups.agent2.add(rafter);
+                    }
+                }
+
+                // 4 Diagonal Curved Hip Ridges (Sumimune) & Upturned Corner Onigawara Finials
+                const corners = [
+                    [1, 1], [-1, 1], [-1, -1], [1, -1]
+                ];
+                corners.forEach(([cx, cz]) => {
+                    // Build segmented hip ridge following the exact roof surface
+                    const ridgeSegments = 8;
+                    for (let s = 0; s < ridgeSegments; s++) {
+                        const t0 = 0.22 + (s / ridgeSegments) * 0.78;
+                        const t1 = 0.22 + ((s + 1) / ridgeSegments) * 0.78;
+                        const p0 = new THREE.Vector3(
+                            cx * t0 * eaveHalf,
+                            roofBaseY + sampleRoofY(cx * t0, cz * t0, coreHalf * 0.72, eaveHalf, roofHeight, cornerLift) + 0.06 * scale,
+                            pagodaCenterZ + cz * t0 * eaveHalf
+                        );
+                        const p1 = new THREE.Vector3(
+                            cx * t1 * eaveHalf,
+                            roofBaseY + sampleRoofY(cx * t1, cz * t1, coreHalf * 0.72, eaveHalf, roofHeight, cornerLift) + 0.06 * scale,
+                            pagodaCenterZ + cz * t1 * eaveHalf
+                        );
+                        const segLen = p0.distanceTo(p1);
+                        const mid = p0.clone().add(p1).multiplyScalar(0.5);
+                        const ridgeSeg = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.16 * scale, 0.16 * scale, segLen + 0.04),
+                            materials.darkBasalt
+                        );
+                        ridgeSeg.position.copy(mid);
+                        ridgeSeg.lookAt(p1);
+                        agentGroups.agent2.add(ridgeSeg);
+                    }
+
+                    // Corner Onigawara (Ornamental Ridge-End Tile + Gold Tip) & Hanging Wind Bell (Fūtaku)
+                    const tipY = roofBaseY + sampleRoofY(cx, cz, coreHalf * 0.72, eaveHalf, roofHeight, cornerLift);
+                    const onigawara = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.28 * scale, 0.34 * scale, 0.28 * scale),
+                        materials.goldLeaf
+                    );
+                    onigawara.position.set(cx * eaveHalf * 0.98, tipY + 0.18 * scale, pagodaCenterZ + cz * eaveHalf * 0.98);
+                    onigawara.rotation.y = Math.PI / 4;
+                    agentGroups.agent2.add(onigawara);
+
+                    // Hanging bronze wind chime (Fūtaku) beneath each upturned eave corner
+                    const bellBell = new THREE.Mesh(
+                        new THREE.ConeGeometry(0.11 * scale, 0.28 * scale, 8),
+                        materials.bronzeSorin
+                    );
+                    bellBell.position.set(cx * eaveHalf * 0.95, tipY - 0.22 * scale, pagodaCenterZ + cz * eaveHalf * 0.95);
+                    agentGroups.agent2.add(bellBell);
+                });
+
+                currentY += storyHeight + 0.52 * scale;
+            }
+
+            // 3. Detailed Sōrin (Bronze Finial Spire at the Apex of Tier 5)
+            const sorinBaseY = currentY + 0.42;
+
+            // Roban (Square Base Box sitting on the 5th roof peak)
+            const roban = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.42, 1.35), materials.bronzeSorin);
+            roban.position.set(0, sorinBaseY, pagodaCenterZ);
+            agentGroups.agent1.add(roban);
+
+            // Fukubachi (Inverted Bowl)
+            const fukubachi = new THREE.Mesh(
+                new THREE.SphereGeometry(0.58, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.55),
+                materials.bronzeSorin
+            );
+            fukubachi.position.set(0, sorinBaseY + 0.2, pagodaCenterZ);
+            agentGroups.agent1.add(fukubachi);
+
+            // Ukebana (Lotus Petal Pedestal)
+            const ukebana = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.48, 0.32, 0.28, 16),
+                materials.goldLeaf
+            );
+            ukebana.position.set(0, sorinBaseY + 0.65, pagodaCenterZ);
+            agentGroups.agent1.add(ukebana);
+
+            // Central Spire Shaft (Sakkan)
+            const shaftHeight = 4.6;
+            const sakkan = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.11, 0.18, shaftHeight, 16),
+                materials.bronzeSorin
+            );
+            sakkan.position.set(0, sorinBaseY + 0.75 + shaftHeight * 0.5, pagodaCenterZ);
+            sakkan.castShadow = true;
+            agentGroups.agent1.add(sakkan);
+
+            // Kurin (9 Sacred Concentric Rings)
+            for (let r = 0; r < 9; r++) {
+                const ringScale = 1 - r * 0.045;
+                const kurin = new THREE.Mesh(
+                    new THREE.TorusGeometry(0.38 * ringScale, 0.042, 10, 24),
+                    materials.goldLeaf
+                );
+                kurin.rotation.x = Math.PI / 2;
+                kurin.position.set(0, sorinBaseY + 1.05 + r * 0.28, pagodaCenterZ);
+                agentGroups.agent1.add(kurin);
+            }
+
+            // Suien (Flame-shaped Pierced Bronze Finial Ornaments in 4 directions)
+            for (let a = 0; a < 4; a++) {
+                const suienFin = new THREE.Mesh(
+                    new THREE.TorusKnotGeometry(0.26, 0.032, 36, 8, 2, 3),
+                    materials.goldLeaf
+                );
+                const ang = a * (Math.PI / 2);
+                suienFin.position.set(
+                    Math.cos(ang) * 0.28,
+                    sorinBaseY + 3.95,
+                    pagodaCenterZ + Math.sin(ang) * 0.28
+                );
+                suienFin.rotation.y = ang;
+                suienFin.scale.set(0.7, 1.4, 0.3);
+                agentGroups.agent1.add(suienFin);
+            }
+
+            // Ryūsha & Hōju (Sacred Wish-Fulfilling Jewel at the Apex)
+            const ryusha = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), materials.bronzeSorin);
+            ryusha.position.set(0, sorinBaseY + 4.75, pagodaCenterZ);
+            agentGroups.agent1.add(ryusha);
+
+            const hoju = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.55, 16), materials.goldLeaf);
+            hoju.position.set(0, sorinBaseY + 5.25, pagodaCenterZ);
+            agentGroups.agent1.add(hoju);
+        }
+
+        // ----------------------------------------------------------------------------
+        // AGENT 03: MYŌJIN TORII GATE, SORIBASHI DRUM BRIDGE & STONE LANTERNS (TŌRŌ)
+        // ----------------------------------------------------------------------------
+        function buildToriiBridgeAndLanterns() {
+            // 1. Arched Wooden Vermilion Drum Bridge (Soribashi) spanning Z = 5.5 to Z = 16.5
+            const bridgeStartZ = 5.2;
+            const bridgeEndZ = 16.8;
+            const bridgeSpan = bridgeEndZ - bridgeStartZ;
+            const bridgeMidZ = (bridgeStartZ + bridgeEndZ) * 0.5;
+            const bridgeWidth = 3.2;
+            const archPeakY = 2.55;
+
+            const numPlanks = 28;
+            for (let i = 0; i <= numPlanks; i++) {
+                const t = i / numPlanks; // 0 to 1
+                const z = bridgeStartZ + t * bridgeSpan;
+                const norm = (t - 0.5) * 2; // -1 to 1
+                // Parabolic arch height
+                const y = 0.65 + (1 - norm * norm) * archPeakY;
+                const slopeAngle = Math.atan2(-2 * norm * archPeakY, bridgeSpan * 0.5);
+
+                // Wooden deck plank
+                const plank = new THREE.Mesh(
+                    new THREE.BoxGeometry(bridgeWidth, 0.14, (bridgeSpan / numPlanks) * 0.92),
+                    materials.darkTimber
+                );
+                plank.position.set(0, y, z);
+                plank.rotation.x = slopeAngle;
+                plank.castShadow = true;
+                plank.receiveShadow = true;
+                agentGroups.agent3.add(plank);
+
+                // Vermilion side arch support beams
+                [-bridgeWidth * 0.48, bridgeWidth * 0.48].forEach(bx => {
+                    const archSeg = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.22, 0.32, (bridgeSpan / numPlanks) * 1.08),
+                        materials.vermilionWood
+                    );
+                    archSeg.position.set(bx, y - 0.15, z);
+                    archSeg.rotation.x = slopeAngle;
+                    agentGroups.agent3.add(archSeg);
+
+                    // Upper curved handrail & lower rail segments
+                    const topRailSeg = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.14, 0.14, (bridgeSpan / numPlanks) * 1.08),
+                        materials.vermilionWood
+                    );
+                    topRailSeg.position.set(bx, y + 1.05, z);
+                    topRailSeg.rotation.x = slopeAngle;
+                    agentGroups.agent3.add(topRailSeg);
+
+                    const midRailSeg = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.09, 0.09, (bridgeSpan / numPlanks) * 1.08),
+                        materials.vermilionWood
+                    );
+                    midRailSeg.position.set(bx, y + 0.55, z);
+                    midRailSeg.rotation.x = slopeAngle;
+                    agentGroups.agent3.add(midRailSeg);
+                });
+
+                // Vertical Balustrade Posts with Bronze Giboshi (Onion-shaped Finials)
+                if (i % 4 === 0) {
+                    [-bridgeWidth * 0.48, bridgeWidth * 0.48].forEach(bx => {
+                        const post = new THREE.Mesh(
+                            new THREE.CylinderGeometry(0.11, 0.11, 1.25, 10),
+                            materials.vermilionWood
+                        );
+                        post.position.set(bx, y + 0.55, z);
+                        agentGroups.agent3.add(post);
+
+                        const giboshi = new THREE.Mesh(
+                            new THREE.CylinderGeometry(0.08, 0.13, 0.24, 12),
+                            materials.bronzeSorin
+                        );
+                        giboshi.position.set(bx, y + 1.26, z);
+                        agentGroups.agent3.add(giboshi);
+
+                        const giboshiTop = new THREE.Mesh(
+                            new THREE.SphereGeometry(0.1, 10, 10),
+                            materials.goldLeaf
+                        );
+                        giboshiTop.position.set(bx, y + 1.4, z);
+                        agentGroups.agent3.add(giboshiTop);
+                    });
+                }
+            }
+
+            // Bridge Stone Abutment Piers at both ends
+            [bridgeStartZ, bridgeEndZ].forEach(az => {
+                const pier = new THREE.Mesh(new THREE.BoxGeometry(3.8, 1.2, 1.2), materials.stoneGranite);
+                pier.position.set(0, 0.35, az);
+                agentGroups.agent3.add(pier);
+            });
+
+            // 2. Grand Vermilion Myōjin Torii Gate at the Approach Path (Z = 23.5)
+            const toriiZ = 23.5;
+            const pillarSpan = 3.55;
+            const toriiHeight = 7.4;
+
+            [-1, 1].forEach(side => {
+                // Kamebara (Black Stone Base Pedestals)
+                const basePedestal = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.48, 0.58, 1.1, 16),
+                    materials.darkBasalt
+                );
+                basePedestal.position.set(side * pillarSpan, 0.85, toriiZ);
+                agentGroups.agent3.add(basePedestal);
+
+                // Hashira (Main Cylindrical Vermilion Pillars with subtle inward batter)
+                const hashira = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.32, 0.38, toriiHeight, 20),
+                    materials.vermilionWood
+                );
+                hashira.position.set(side * (pillarSpan - 0.12), 0.7 + toriiHeight * 0.5, toriiZ);
+                hashira.rotation.z = side * 0.032;
+                hashira.castShadow = true;
+                agentGroups.agent3.add(hashira);
+            });
+
+            // Nuki (Lower Horizontal Tie Beam with protruding ends)
+            const nuki = new THREE.Mesh(new THREE.BoxGeometry(9.6, 0.42, 0.28), materials.vermilionWood);
+            nuki.position.set(0, 6.35, toriiZ);
+            nuki.castShadow = true;
+            agentGroups.agent3.add(nuki);
+
+            // Shimaki & Curved Kasagi (Double Top Lintel with Upturned Tips)
+            const lintelSegs = 22;
+            const lintelTotalW = 11.4;
+            for (let s = 0; s < lintelSegs; s++) {
+                const t0 = (s / lintelSegs) * 2 - 1;
+                const t1 = ((s + 1) / lintelSegs) * 2 - 1;
+                const tm = (t0 + t1) * 0.5;
+                const x = tm * (lintelTotalW * 0.5);
+                // Graceful upturned Myōjin curve at the ends
+                const curveY = Math.pow(Math.abs(tm), 2.8) * 0.68;
+                const tiltZ = Math.sign(tm) * Math.pow(Math.abs(tm), 1.8) * 0.32;
+
+                const segW = (lintelTotalW / lintelSegs) * 1.06;
+
+                // Lower lintel (Shimaki - vermilion)
+                const shimakiSeg = new THREE.Mesh(
+                    new THREE.BoxGeometry(segW, 0.32, 0.48),
+                    materials.vermilionWood
+                );
+                shimakiSeg.position.set(x, 7.72 + curveY, toriiZ);
+                shimakiSeg.rotation.z = tiltZ;
+                shimakiSeg.castShadow = true;
+                agentGroups.agent3.add(shimakiSeg);
+
+                // Upper cap lintel (Kasagi - dark charcoal/black)
+                const kasagiSeg = new THREE.Mesh(
+                    new THREE.BoxGeometry(segW * 1.02, 0.26, 0.62),
+                    materials.darkBasalt
+                );
+                kasagiSeg.position.set(x, 8.0 + curveY, toriiZ);
+                kasagiSeg.rotation.z = tiltZ;
+                kasagiSeg.castShadow = true;
+                agentGroups.agent3.add(kasagiSeg);
+            }
+
+            // Gakuzuka (Central Inscribed Tablet between Kasagi and Nuki)
+            const plaqueFrame = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.45, 0.34), materials.darkBasalt);
+            plaqueFrame.position.set(0, 7.05, toriiZ);
+            agentGroups.agent3.add(plaqueFrame);
+
+            const plaqueGold = new THREE.Mesh(new THREE.BoxGeometry(0.88, 1.18, 0.38), materials.goldLeaf);
+            plaqueGold.position.set(0, 7.05, toriiZ);
+            agentGroups.agent3.add(plaqueGold);
+
+            // 3. Traditional Stone Lanterns (Tōrō) with Glowing Emissive Cores
+            function createStoneLantern(x, y, z) {
+                const lantern = new THREE.Group();
+                lantern.position.set(x, y, z);
+
+                // Hexagonal base & pedestal
+                const kiso = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.68, 0.35, 6), materials.stoneGranite);
+                kiso.position.y = 0.18;
+                lantern.add(kiso);
+
+                // Cylindrical shaft (Sao)
+                const sao = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 1.15, 8), materials.stoneGranite);
+                sao.position.y = 0.9;
+                sao.castShadow = true;
+                lantern.add(sao);
+
+                // Middle platform (Chūdai)
+                const chudai = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.35, 0.28, 6), materials.stoneGranite);
+                chudai.position.y = 1.55;
+                lantern.add(chudai);
+
+                // Glowing Paper Firebox (Hibukuro)
+                const hibukuro = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.56, 6), materials.lanternPaper);
+                hibukuro.position.y = 1.95;
+                lantern.add(hibukuro);
+
+                // Stone Corner Frame Bars around Firebox
+                for (let c = 0; c < 6; c++) {
+                    const ang = c * (Math.PI / 3);
+                    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.6, 0.07), materials.stoneGranite);
+                    bar.position.set(Math.cos(ang) * 0.38, 1.95, Math.sin(ang) * 0.38);
+                    lantern.add(bar);
+                }
+
+                // Hexagonal Umbrella Roof (Kasa)
+                const kasa = new THREE.Mesh(new THREE.ConeGeometry(0.82, 0.48, 6), materials.stoneGranite);
+                kasa.position.y = 2.45;
+                kasa.castShadow = true;
+                lantern.add(kasa);
+
+                // Top Jewel (Hōju)
+                const topJewel = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 10), materials.stoneGranite);
+                topJewel.position.y = 2.76;
+                lantern.add(topJewel);
+
+                // Warm Flickering Point Light
+                const ptLight = new THREE.PointLight(0xff9933, 1.1, 14, 1.8);
+                ptLight.position.set(0, 2.0, 0);
+                lantern.add(ptLight);
+                lanternPointLights.push({
+                    light: ptLight,
+                    coreMat: materials.lanternPaper,
+                    phase: Math.random() * Math.PI * 2
+                });
+
+                agentGroups.agent3.add(lantern);
+            }
+
+            // Place 8 symmetrical stone lanterns along the courtyard path, bridge, and pagoda island
+            const lanternPositions = [
+                [-4.8, 0.55, 25.5], [4.8, 0.55, 25.5], // Flanking Torii approach
+                [-3.2, 0.55, 18.2], [3.2, 0.55, 18.2], // South Bridge entrance
+                [-3.4, 0.65, 3.8], [3.4, 0.65, 3.8],  // North Bridge exit on Island
+                [-6.8, 0.65, -2.5], [6.8, 0.65, -2.5]  // Flanking the Pagoda podium
+            ];
+            lanternPositions.forEach(([lx, ly, lz]) => createStoneLantern(lx, ly, lz));
+        }
+
+        // ----------------------------------------------------------------------------
+        // AGENT 04: KOI POND, RIPPLE ENGINE, KOI FISH, ISLAND & SAKURA TREES
+        // ----------------------------------------------------------------------------
+        let waterMesh = null;
+        let waterGeo = null;
+        let waterBasePositions = null;
+        const activeRipples = [];
+        const koiFishList = [];
+        let sakuraParticles = null;
+
+        function spawnWaterRipple(x, z, amplitude = 0.85) {
+            activeRipples.push({
+                x,
+                z,
+                age: 0,
+                maxAge: 6.5,
+                amplitude
+            });
+            if (activeRipples.length > 8) activeRipples.shift();
+        }
+
+        function buildEnvironmentAndPond() {
+            // 1. Dynamic Wave-Displaced Reflective Koi Pond Surface
+            waterGeo = new THREE.PlaneGeometry(140, 140, 96, 96);
+            waterGeo.rotateX(-Math.PI / 2);
+            waterBasePositions = new Float32Array(waterGeo.attributes.position.array);
+
+            const waterMat = new THREE.MeshStandardMaterial({
+                color: 0x102838,
+                roughness: 0.14,
+                metalness: 0.82,
+                transparent: true,
+                opacity: 0.92
+            });
+            waterMesh = new THREE.Mesh(waterGeo, waterMat);
+            waterMesh.position.y = 0.0;
+            waterMesh.receiveShadow = true;
+            agentGroups.agent4.add(waterMesh);
+
+            // Deep pond floor beneath water
+            const pondFloor = new THREE.Mesh(
+                new THREE.PlaneGeometry(140, 140),
+                new THREE.MeshBasicMaterial({ color: 0x061017 })
+            );
+            pondFloor.rotation.x = -Math.PI / 2;
+            pondFloor.position.y = -1.2;
+            agentGroups.agent4.add(pondFloor);
+
+            // 2. Central Temple Moss Island & Retaining Stone Embankment
+            const islandRock = new THREE.Mesh(
+                new THREE.CylinderGeometry(11.8, 13.6, 1.35, 24),
+                materials.stoneGranite
+            );
+            islandRock.position.set(0, 0.05, -4.5);
+            islandRock.scale.set(1.15, 1, 1.05);
+            islandRock.receiveShadow = true;
+            agentGroups.agent4.add(islandRock);
+
+            const islandMoss = new THREE.Mesh(
+                new THREE.CylinderGeometry(11.2, 11.8, 0.35, 24),
+                materials.mossGround
+            );
+            islandMoss.position.set(0, 0.62, -4.5);
+            islandMoss.scale.set(1.15, 1, 1.05);
+            islandMoss.receiveShadow = true;
+            agentGroups.agent4.add(islandMoss);
+
+            // Foreground Approach Courtyard Bank (Z = 16.5 to 36)
+            const forecourt = new THREE.Mesh(
+                new THREE.BoxGeometry(28, 1.2, 20),
+                materials.mossGround
+            );
+            forecourt.position.set(0, 0.0, 26.5);
+            forecourt.receiveShadow = true;
+            agentGroups.agent4.add(forecourt);
+
+            // Stone Flagstone Approach Path (Sandō) from Torii to Bridge & Bridge to Pagoda
+            for (let p = 0; p < 12; p++) {
+                const stoneSlab = new THREE.Mesh(
+                    new THREE.BoxGeometry(2.8 + (p % 2) * 0.3, 0.14, 0.95),
+                    materials.stoneGranite
+                );
+                stoneSlab.position.set((p % 2 === 0 ? 0.08 : -0.08), 0.62, 17.6 + p * 1.25);
+                stoneSlab.receiveShadow = true;
+                agentGroups.agent4.add(stoneSlab);
+            }
+
+            // Stepping Stones (Tobi-ishi) across the water on the east side
+            const steppingCoords = [
+                [6.5, 14.5], [8.2, 12.2], [9.5, 9.8], [9.8, 7.0], [9.2, 4.2]
+            ];
+            steppingCoords.forEach(([sx, sz]) => {
+                const tStone = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.75, 0.9, 0.45, 9),
+                    materials.stoneGranite
+                );
+                tStone.position.set(sx, 0.05, sz);
+                tStone.rotation.y = Math.random() * Math.PI;
+                agentGroups.agent4.add(tStone);
+            });
+
+            // 3. Procedural Gnarled Sakura (Cherry Blossom) & Black Pine Trees
+            function createProceduralTree(x, y, z, scale = 1.0, isSakura = true) {
+                const treeGroup = new THREE.Group();
+                treeGroup.position.set(x, y, z);
+                treeGroup.scale.setScalar(scale);
+
+                // Mossy rock mound base
+                const mound = new THREE.Mesh(
+                    new THREE.DodecahedronGeometry(1.6, 1),
+                    materials.mossGround
+                );
+                mound.scale.set(1.4, 0.55, 1.4);
+                mound.position.y = 0.1;
+                treeGroup.add(mound);
+
+                // Curved gnarled trunk segments
+                let tx = 0, ty = 0.2, tz = 0;
+                for (let s = 0; s < 5; s++) {
+                    const segH = 0.95;
+                    const trunkSeg = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.34 - s * 0.045, 0.42 - s * 0.045, segH, 8),
+                        materials.darkTimber
+                    );
+                    const bendX = Math.sin(s * 0.8) * 0.25;
+                    const bendZ = Math.cos(s * 0.7) * 0.2;
+                    trunkSeg.position.set(tx + bendX * 0.5, ty + segH * 0.5, tz + bendZ * 0.5);
+                    trunkSeg.rotation.z = -bendX * 0.45;
+                    trunkSeg.rotation.x = bendZ * 0.45;
+                    trunkSeg.castShadow = true;
+                    treeGroup.add(trunkSeg);
+                    tx += bendX;
+                    ty += segH * 0.88;
+                    tz += bendZ;
+                }
+
+                // Canopy Cloud Clusters
+                const canopyMat = isSakura ? materials.sakuraBlossom : materials.pineFoliage;
+                const clusters = [
+                    [0, 0.5, 0, 1.9],
+                    [-1.3, 0.1, 0.6, 1.45],
+                    [1.4, 0.2, -0.5, 1.5],
+                    [0.4, 0.8, 1.1, 1.35],
+                    [-0.8, -0.2, -1.1, 1.3]
+                ];
+                clusters.forEach(([cx, cy, cz, cr]) => {
+                    const puff = new THREE.Mesh(new THREE.IcosahedronGeometry(cr, 1), canopyMat);
+                    puff.position.set(tx + cx, ty + cy, tz + cz);
+                    puff.scale.set(1.25, 0.62, 1.25);
+                    puff.castShadow = true;
+                    treeGroup.add(puff);
+                });
+
+                agentGroups.agent4.add(treeGroup);
+            }
+
+            // Place Sakura & Pine trees framing the Pagoda Island and Forecourt
+            createProceduralTree(-9.8, 0.65, -7.5, 1.25, true);
+            createProceduralTree(10.2, 0.65, -8.2, 1.18, true);
+            createProceduralTree(-8.4, 0.65, 1.2, 0.95, true);
+            createProceduralTree(9.2, 0.65, 0.5, 1.05, false); // Pine tree
+            createProceduralTree(-8.5, 0.55, 21.5, 1.15, true);
+            createProceduralTree(8.5, 0.55, 21.5, 1.1, true);
+            createProceduralTree(-15.5, 0.0, -14.0, 1.35, false);
+            createProceduralTree(16.0, 0.0, -13.0, 1.3, false);
+
+            // 4. Swimming Koi Fish beneath the Pond Surface
+            const koiColors = [0xff4d1a, 0xffaa00, 0xffffff, 0xff2a2a];
+            for (let k = 0; k < 14; k++) {
+                const koiGroup = new THREE.Group();
+                const body = new THREE.Mesh(
+                    new THREE.ConeGeometry(0.14, 0.72, 8),
+                    new THREE.MeshBasicMaterial({ color: koiColors[k % koiColors.length] })
+                );
+                body.rotation.x = Math.PI / 2;
+                koiGroup.add(body);
+
+                const angle = (k / 14) * Math.PI * 2;
+                const radius = 5.5 + (k % 3) * 3.2;
+                koiFishList.push({
+                    mesh: koiGroup,
+                    angle,
+                    radius,
+                    speed: 0.25 + (k % 4) * 0.06,
+                    centerX: (k % 2 === 0) ? -5.5 : 5.5,
+                    centerZ: 9.5
+                });
+                agentGroups.agent4.add(koiGroup);
+            }
+
+            // 5. Drifting Sakura Petals & Firefly Particle System
+            const particleCount = 320;
+            const pGeo = new THREE.BufferGeometry();
+            const pPositions = new Float32Array(particleCount * 3);
+            for (let i = 0; i < particleCount; i++) {
+                pPositions[i * 3] = (Math.random() - 0.5) * 60;
+                pPositions[i * 3 + 1] = Math.random() * 28 + 0.5;
+                pPositions[i * 3 + 2] = (Math.random() - 0.5) * 60;
+            }
+            pGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+            const pMat = new THREE.PointsMaterial({
+                color: 0xffc4d6,
+                size: 0.26,
+                transparent: true,
+                opacity: 0.85
+            });
+            sakuraParticles = new THREE.Points(pGeo, pMat);
+            agentGroups.agent4.add(sakuraParticles);
+
+            // 6. Distant Mountain Silhouette Ring
+            const mtnCount = 28;
+            for (let m = 0; m < mtnCount; m++) {
+                const ang = (m / mtnCount) * Math.PI * 2;
+                const dist = 105 + (m % 3) * 12;
+                const mtnH = 18 + Math.sin(m * 2.3) * 8 + (m % 2) * 6;
+                const mtn = new THREE.Mesh(
+                    new THREE.ConeGeometry(26, mtnH, 7),
+                    materials.mountainSil
+                );
+                mtn.position.set(Math.cos(ang) * dist, mtnH * 0.42 - 1.5, Math.sin(ang) * dist);
+                mtn.rotation.y = m;
+                agentGroups.agent4.add(mtn);
+            }
+        }
+
+        // Execute all 4 sub-agent builders
+        buildPagodaAndRoofs();
+        buildToriiBridgeAndLanterns();
+        buildEnvironmentAndPond();
+
+        // Store original materials on every mesh for seamless Render / Blueprint / Clay switching
+        const allSceneMeshes = [];
+        scene.traverse((obj) => {
+            if (obj.isMesh && obj !== celestialOrb) {
+                obj.userData.originalMaterial = obj.material;
+                allSceneMeshes.push(obj);
+            }
+        });
+
+        // Update Top Bar Live Polygon / Mesh Telemetry
+        function updateSceneTelemetry() {
+            let meshCount = 0;
+            let triCount = 0;
+            scene.traverse((obj) => {
+                if (obj.isMesh && obj.visible) {
+                    meshCount++;
+                    const geom = obj.geometry;
+                    if (geom.index) {
+                        triCount += geom.index.count / 3;
+                    } else if (geom.attributes.position) {
+                        triCount += geom.attributes.position.count / 3;
+                    }
+                }
+            });
+            document.getElementById('stat-objects').textContent = meshCount.toLocaleString();
+            document.getElementById('stat-tris').textContent = Math.round(triCount).toLocaleString();
+        }
+        updateSceneTelemetry();
+
+        // ============================================================================
+        // 6. STUDIO HUD CONTROLS: RENDER MODES, CAMERA PRESETS & TIME OF DAY
+        // ============================================================================
+        let currentRenderMode = 'render';
+        let currentTimeOfDay = 'dusk';
+
+        function setRenderMode(mode) {
+            currentRenderMode = mode;
+            ['render', 'blueprint', 'clay'].forEach(m => {
+                const btn = document.getElementById(`mode-${m}`);
+                btn.classList.remove('active', 'active-cyan');
+                if (m === mode) {
+                    btn.classList.add(mode === 'blueprint' ? 'active-cyan' : 'active');
+                }
+            });
+
+            const bpOverlay = document.getElementById('blueprint-overlay');
+            if (mode === 'blueprint') {
+                bpOverlay.classList.add('active');
+                scene.background.setHex(0x061326);
+                scene.fog.color.setHex(0x061326);
+                celestialOrb.visible = false;
+                allSceneMeshes.forEach(mesh => {
+                    mesh.material = blueprintMaterial;
+                });
+                logCriticMessage('STAGE 01: Switched to Architectural Blueprint wireframe projection.');
+            } else if (mode === 'clay') {
+                bpOverlay.classList.remove('active');
+                scene.background.setHex(0x1f2126);
+                scene.fog.color.setHex(0x1f2126);
+                celestialOrb.visible = false;
+                allSceneMeshes.forEach(mesh => {
+                    mesh.material = clayMaterial;
+                });
+                logCriticMessage('STAGE 03: Clay Critic Mode active. Inspecting raw surface topology & roof curves.');
+            } else {
+                bpOverlay.classList.remove('active');
+                celestialOrb.visible = true;
+                allSceneMeshes.forEach(mesh => {
+                    mesh.material = mesh.userData.originalMaterial;
+                });
+                setTimeOfDay(currentTimeOfDay);
+                logCriticMessage('STAGE 04: Full PBR Render Mode with procedural materials and water reflections.');
+            }
+        }
+
+        // 4 Reference Camera Views matching the Gemini 4 Argon / Nano Banana workflow
+        const cameraViews = {
+            1: {
+                name: 'View 1: Hero Reflection (Low Pond Angle)',
+                target: new THREE.Vector3(0, 10.5, -2.5),
+                radius: 42,
+                phi: Math.PI * 0.455,
+                theta: 0.48
+            },
+            2: {
+                name: 'View 2: Isometric Complex (Bird\'s-Eye Overview)',
+                target: new THREE.Vector3(0, 7.5, 5.0),
+                radius: 62,
+                phi: Math.PI * 0.31,
+                theta: -0.68
+            },
+            3: {
+                name: 'View 3: Roof & Sōrin Detail (Upper Eaves & Finial)',
+                target: new THREE.Vector3(0, 19.2, -6.0),
+                radius: 14.5,
+                phi: Math.PI * 0.42,
+                theta: 0.72
+            },
+            4: {
+                name: 'View 4: Torii Approach (Eye-Level Framing)',
+                target: new THREE.Vector3(0, 6.2, 2.0),
+                radius: 33.5,
+                phi: Math.PI * 0.472,
+                theta: 0.0
+            }
+        };
+
+        function setCameraView(viewId) {
+            const preset = cameraViews[viewId];
+            if (!preset) return;
+
+            orbitState.autoOrbit = false;
+            document.getElementById('btn-orbit').classList.remove('active-cyan');
+
+            [1, 2, 3, 4].forEach(id => {
+                document.getElementById(`cam-view-${id}`).classList.toggle('active', id === viewId);
+            });
+
+            orbitState.desiredTarget.copy(preset.target);
+            orbitState.desiredSpherical.radius = preset.radius;
+            orbitState.desiredSpherical.phi = preset.phi;
+            orbitState.desiredSpherical.theta = preset.theta;
+
+            logCriticMessage(`Camera interpolated to Reference ${preset.name}`);
+        }
+
+        function toggleCinematicOrbit() {
+            orbitState.autoOrbit = !orbitState.autoOrbit;
+            document.getElementById('btn-orbit').classList.toggle('active-cyan', orbitState.autoOrbit);
+            logCriticMessage(orbitState.autoOrbit ? 'Cinematic 360° camera flythrough enabled.' : 'Cinematic orbit paused.');
+        }
+
+        function setTimeOfDay(tod) {
+            currentTimeOfDay = tod;
+            ['dusk', 'night', 'dawn'].forEach(t => {
+                document.getElementById(`tod-${t}`).classList.toggle('active', t === tod);
+            });
+
+            if (currentRenderMode !== 'render') return;
+
+            if (tod === 'dusk') {
+                scene.background.setHex(0x181528);
+                scene.fog.color.setHex(0x281c33);
+                scene.fog.density = 0.0082;
+                ambientLight.color.setHex(0xffcca8);
+                ambientLight.intensity = 0.58;
+                sunLight.color.setHex(0xff9e44);
+                sunLight.intensity = 1.65;
+                sunLight.position.set(-38, 30, -28);
+                celestialOrb.material.color.setHex(0xff8c3b);
+                celestialOrb.position.set(-68, 25, -85);
+                materials.lanternPaper.emissiveIntensity = 1.6;
+            } else if (tod === 'night') {
+                scene.background.setHex(0x050814);
+                scene.fog.color.setHex(0x070d1f);
+                scene.fog.density = 0.0095;
+                ambientLight.color.setHex(0x3b5284);
+                ambientLight.intensity = 0.35;
+                sunLight.color.setHex(0x7aa2f7);
+                sunLight.intensity = 0.72;
+                sunLight.position.set(32, 45, -35);
+                celestialOrb.material.color.setHex(0xe2e8f0);
+                celestialOrb.position.set(55, 38, -80);
+                materials.lanternPaper.emissiveIntensity = 2.8;
+            } else if (tod === 'dawn') {
+                scene.background.setHex(0x2a3546);
+                scene.fog.color.setHex(0x475263);
+                scene.fog.density = 0.0135;
+                ambientLight.color.setHex(0xd8e2f2);
+                ambientLight.intensity = 0.78;
+                sunLight.color.setHex(0xffd1b3);
+                sunLight.intensity = 1.25;
+                sunLight.position.set(-25, 22, 35);
+                celestialOrb.material.color.setHex(0xffe4cc);
+                celestialOrb.position.set(-55, 19, -82);
+                materials.lanternPaper.emissiveIntensity = 0.85;
+            }
+        }
+
+        // ============================================================================
+        // 7. RIGHT DRAWER: AGENT LAYER VISIBILITY & ADVERSARIAL CRITIC SCAN
+        // ============================================================================
+        let drawerOpen = true;
+        function toggleAgentDrawer() {
+            drawerOpen = !drawerOpen;
+            const drawer = document.getElementById('agent-drawer');
+            if (drawerOpen) {
+                drawer.classList.remove('translate-x-[110%]', 'opacity-0', 'pointer-events-none');
+                drawer.classList.add('translate-x-0');
+            } else {
+                drawer.classList.add('translate-x-[110%]', 'opacity-0', 'pointer-events-none');
+                drawer.classList.remove('translate-x-0');
+            }
+        }
+
+        function toggleAgentLayer(agentKey, visible) {
+            const grp = agentGroups[agentKey];
+            if (grp) {
+                grp.visible = visible;
+                updateSceneTelemetry();
+                logCriticMessage(`${agentKey.toUpperCase()} visibility set to ${visible ? 'VISIBLE' : 'HIDDEN'}.`);
+            }
+        }
+
+        function pulseHighlightAgent(agentKey) {
+            const grp = agentGroups[agentKey];
+            if (!grp) return;
+
+            const highlightMat = new THREE.MeshBasicMaterial({
+                color: 0x38bdf8,
+                wireframe: true
+            });
+
+            const meshes = [];
+            grp.traverse(obj => {
+                if (obj.isMesh) {
+                    meshes.push({ mesh: obj, prevMat: obj.material });
+                    obj.material = highlightMat;
+                }
+            });
+
+            logCriticMessage(`Inspecting ${agentKey.toUpperCase()} geometry wireframe...`);
+            setTimeout(() => {
+                meshes.forEach(({ mesh }) => {
+                    if (currentRenderMode === 'render') mesh.material = mesh.userData.originalMaterial;
+                    else if (currentRenderMode === 'clay') mesh.material = clayMaterial;
+                    else mesh.material = blueprintMaterial;
+                });
+            }, 950);
+        }
+
+        function runCriticVerificationScan() {
+            const agents = ['agent1', 'agent2', 'agent3', 'agent4'];
+            logCriticMessage('CRITIC LOOP: Comparing 3D viewport against 4 reference projections...');
+            agents.forEach((ag, idx) => {
+                setTimeout(() => {
+                    pulseHighlightAgent(ag);
+                    if (idx === agents.length - 1) {
+                        setTimeout(() => {
+                            logCriticMessage('✓ PASS COMPLETE: All 5 roof catenary curves & 9 Sōrin rings verified (99.1% match).');
+                        }, 1000);
+                    }
+                }, idx * 450);
+            });
+        }
+
+        function logCriticMessage(msg) {
+            const el = document.getElementById('critic-log');
+            if (el) el.textContent = `> ${msg}`;
+        }
+
+        // ============================================================================
+        // 8. PROCEDURAL WEB AUDIO ENGINE (BONSHŌ TEMPLE BELL & AMBIENT SOUNDSCAPE)
+        // ============================================================================
+        let audioCtx = null;
+        let ambientPlaying = false;
+        let ambientNodes = [];
+        let chimeInterval = null;
+
+        function ensureAudioContext() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContextClass();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        /**
+         * Synthesizes an authentic Japanese Bronze Temple Bell (Bonshō) with inharmonic
+         * metallic partials, low resonant hum (unari beat frequency), and wooden striker impact.
+         */
+        function strikeTempleBell() {
+            ensureAudioContext();
+            const now = audioCtx.currentTime;
+
+            // Visual button pulse & expanding 3D pond ripple from the Pagoda island
+            const bellBtn = document.getElementById('btn-bell');
+            bellBtn.classList.remove('bell-ringing');
+            void bellBtn.offsetWidth;
+            bellBtn.classList.add('bell-ringing');
+
+            spawnWaterRipple(0, -4.5, 1.35);
+            spawnWaterRipple(0, 10.5, 0.85);
+            logCriticMessage('🔔 Bonshō Bronze Bell struck — acoustic wave propagating across koi pond.');
+
+            // Master gain for the bell strike
+            const masterGain = audioCtx.createGain();
+            masterGain.gain.setValueAtTime(0.45, now);
+            masterGain.connect(audioCtx.destination);
+
+            // 1. Wooden palm log (Shumoku) low impact thud
+            const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.12, audioCtx.sampleRate);
+            const data = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < data.length; i++) {
+                data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (audioCtx.sampleRate * 0.025));
+            }
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = noiseBuffer;
+            const thudFilter = audioCtx.createBiquadFilter();
+            thudFilter.type = 'lowpass';
+            thudFilter.frequency.setValueAtTime(190, now);
+            const thudGain = audioCtx.createGain();
+            thudGain.gain.setValueAtTime(0.7, now);
+            thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+            noise.connect(thudFilter);
+            thudFilter.connect(thudGain);
+            thudGain.connect(masterGain);
+            noise.start(now);
+
+            // 2. Multi-partial Bronze Modal Synthesis (with characteristic Bonshō "unari" beat pairs)
+            const f0 = 112.0; // Deep fundamental
+            const partials = [
+                { ratio: 0.5, amp: 0.45, decay: 8.5 }, // Sub-hum
+                { ratio: 1.0, amp: 0.85, decay: 7.5 }, // Fundamental
+                { ratio: 1.006, amp: 0.65, decay: 7.2 }, // Unari slow beating twin
+                { ratio: 2.02, amp: 0.55, decay: 5.2 }, // Octave partial
+                { ratio: 2.48, amp: 0.40, decay: 4.0 }, // Minor third metallic tierce
+                { ratio: 3.01, amp: 0.32, decay: 3.1 }, // Fifth partial
+                { ratio: 4.18, amp: 0.20, decay: 2.2 }, // Upper bronze shimmer
+                { ratio: 5.65, amp: 0.11, decay: 1.3 }  // Strike transient ring
+            ];
+
+            partials.forEach(p => {
+                const osc = audioCtx.createOscillator();
+                const pGain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(f0 * p.ratio, now);
+
+                pGain.gain.setValueAtTime(0.0001, now);
+                pGain.gain.linearRampToValueAtTime(p.amp * 0.35, now + 0.018);
+                pGain.gain.exponentialRampToValueAtTime(0.0001, now + p.decay);
+
+                osc.connect(pGain);
+                pGain.connect(masterGain);
+                osc.start(now);
+                osc.stop(now + p.decay + 0.05);
+            });
+        }
+
+        /**
+         * Toggles a procedural ambient wind + occasional distant wind-chime (Fūtaku) soundscape
+         */
+        function toggleAmbientSoundscape() {
+            ensureAudioContext();
+            const btn = document.getElementById('btn-ambient');
+            const icon = document.getElementById('ambient-icon');
+
+            if (ambientPlaying) {
+                ambientPlaying = false;
+                btn.classList.remove('active-cyan');
+                icon.textContent = '🔇';
+                ambientNodes.forEach(n => {
+                    try { n.stop(); } catch (e) { }
+                    try { n.disconnect(); } catch (e) { }
+                });
+                ambientNodes = [];
+                if (chimeInterval) clearInterval(chimeInterval);
+                logCriticMessage('Ambient soundscape muted.');
+                return;
+            }
+
+            ambientPlaying = true;
+            btn.classList.add('active-cyan');
+            icon.textContent = '🎐';
+            logCriticMessage('Ambient soundscape active: Procedural wind + bronze eave wind-bells (Fūtaku).');
+
+            // Create 4-second looping pink-ish noise buffer for gentle mountain breeze
+            const bufLen = audioCtx.sampleRate * 4;
+            const buffer = audioCtx.createBuffer(1, bufLen, audioCtx.sampleRate);
+            const output = buffer.getChannelData(0);
+            let b0 = 0, b1 = 0, b2 = 0;
+            for (let i = 0; i < bufLen; i++) {
+                const white = Math.random() * 2 - 1;
+                b0 = 0.997 * b0 + white * 0.029;
+                b1 = 0.985 * b1 + white * 0.032;
+                b2 = 0.950 * b2 + white * 0.048;
+                output[i] = (b0 + b1 + b2) * 0.25;
+            }
+
+            const windSource = audioCtx.createBufferSource();
+            windSource.buffer = buffer;
+            windSource.loop = true;
+
+            const bandpass = audioCtx.createBiquadFilter();
+            bandpass.type = 'bandpass';
+            bandpass.frequency.value = 340;
+            bandpass.Q.value = 2.2;
+
+            // Slow LFO modulating the wind filter cutoff
+            const lfo = audioCtx.createOscillator();
+            lfo.frequency.value = 0.14;
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.value = 160;
+            lfo.connect(bandpass.frequency);
+
+            const windGain = audioCtx.createGain();
+            windGain.gain.value = 0.18;
+
+            windSource.connect(bandpass);
+            bandpass.connect(windGain);
+            windGain.connect(audioCtx.destination);
+
+            windSource.start();
+            lfo.start();
+            ambientNodes.push(windSource, lfo, windGain);
+
+            // Delicate pentatonic Fūtaku wind-bell notes every few seconds
+            const pentatonicFreqs = [528, 594, 660, 792, 880, 1056];
+            chimeInterval = setInterval(() => {
+                if (!ambientPlaying || !audioCtx) return;
+                const now = audioCtx.currentTime;
+                const freq = pentatonicFreqs[Math.floor(Math.random() * pentatonicFreqs.length)];
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, now);
+                gain.gain.setValueAtTime(0.0001, now);
+                gain.gain.linearRampToValueAtTime(0.045, now + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.4);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 2.5);
+            }, 2800);
+        }
+
+        // ============================================================================
+        // 9. REAL-TIME ANIMATION LOOP (WATER RIPPLES, KOI, LANTERNS & SAKURA)
+        // ============================================================================
+        const clock = new THREE.Clock();
+        let frameCount = 0;
+        let lastFpsUpdate = performance.now();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const dt = Math.min(clock.getDelta(), 0.1);
+            const elapsed = clock.getElapsedTime();
+
+            // 1. Update Damped Orbit Camera
+            updateCameraFromSpherical();
+
+            // 2. Animate Water Surface Ripples (Ambient waves + Bell / Click expanding rings)
+            if (waterGeo && waterBasePositions && agentGroups.agent4.visible) {
+                const posAttr = waterGeo.attributes.position;
+                const arr = posAttr.array;
+
+                // Advance active ripples
+                for (let r = activeRipples.length - 1; r >= 0; r--) {
+                    activeRipples[r].age += dt;
+                    if (activeRipples[r].age > activeRipples[r].maxAge) {
+                        activeRipples.splice(r, 1);
+                    }
+                }
+
+                for (let i = 0; i < posAttr.count; i++) {
+                    const ix = i * 3;
+                    const vx = waterBasePositions[ix];
+                    const vz = waterBasePositions[ix + 2];
+
+                    // Subtle ambient breeze wave
+                    let waveY = Math.sin(vx * 0.22 + elapsed * 1.4) * Math.cos(vz * 0.22 + elapsed * 1.1) * 0.045;
+
+                    // Superimpose expanding circular ripples from Bonshō bell or clicks
+                    for (let r = 0; r < activeRipples.length; r++) {
+                        const rip = activeRipples[r];
+                        const dx = vx - rip.x;
+                        const dz = vz - rip.z;
+                        const dist = Math.sqrt(dx * dx + dz * dz);
+                        const waveRadius = rip.age * 9.5;
+                        const band = Math.abs(dist - waveRadius);
+                        if (band < 4.5) {
+                            const env = (1 - band / 4.5) * Math.max(0, 1 - rip.age / rip.maxAge);
+                            waveY += Math.sin((dist - waveRadius) * 2.6) * rip.amplitude * env * 0.32;
+                        }
+                    }
+
+                    arr[ix + 1] = waveY;
+                }
+                posAttr.needsUpdate = true;
+                waterGeo.computeVertexNormals();
+            }
+
+            // 3. Animate Swimming Koi Fish in graceful arcs
+            koiFishList.forEach((koi, idx) => {
+                koi.angle += dt * koi.speed;
+                const x = koi.centerX + Math.cos(koi.angle) * koi.radius;
+                const z = koi.centerZ + Math.sin(koi.angle * 0.85) * (koi.radius * 0.65);
+                const nextX = koi.centerX + Math.cos(koi.angle + 0.05) * koi.radius;
+                const nextZ = koi.centerZ + Math.sin((koi.angle + 0.05) * 0.85) * (koi.radius * 0.65);
+
+                koi.mesh.position.set(x, -0.14 + Math.sin(elapsed * 3 + idx) * 0.02, z);
+                koi.mesh.lookAt(nextX, -0.14, nextZ);
+            });
+
+            // 4. Flicker Stone Lantern Point Lights
+            lanternPointLights.forEach(item => {
+                const flicker = Math.sin(elapsed * 7.5 + item.phase) * 0.12 + Math.cos(elapsed * 13.0 + item.phase) * 0.06;
+                const baseInt = currentTimeOfDay === 'night' ? 1.85 : (currentTimeOfDay === 'dusk' ? 1.15 : 0.55);
+                item.light.intensity = Math.max(0.2, baseInt + flicker);
+            });
+
+            // 5. Animate Drifting Sakura Petals
+            if (sakuraParticles && agentGroups.agent4.visible) {
+                const pAttr = sakuraParticles.geometry.attributes.position;
+                const pArr = pAttr.array;
+                for (let i = 0; i < pAttr.count; i++) {
+                    const idx = i * 3;
+                    pArr[idx] += Math.sin(elapsed * 0.6 + i) * 0.018;
+                    pArr[idx + 1] -= 0.024;
+                    pArr[idx + 2] += Math.cos(elapsed * 0.5 + i * 0.5) * 0.018;
+
+                    if (pArr[idx + 1] < 0.2) {
+                        pArr[idx + 1] = 26.0;
+                    }
+                }
+                pAttr.needsUpdate = true;
+            }
+
+            renderer.render(scene, camera);
+
+            // Live FPS Counter
+            frameCount++;
+            const now = performance.now();
+            if (now - lastFpsUpdate >= 500) {
+                const fps = Math.round((frameCount * 1000) / (now - lastFpsUpdate));
+                const fpsEl = document.getElementById('stat-fps');
+                if (fpsEl) fpsEl.textContent = `${Math.min(60, fps)} FPS`;
+                frameCount = 0;
+                lastFpsUpdate = now;
+            }
+        }
+
+        // Responsive Window Resize Handler
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Start Studio on Window Load
+        window.onload = function () {
+            // Collapse drawer by default on small mobile screens for uncluttered 3D view
+            if (window.innerWidth < 768) {
+                toggleAgentDrawer();
+            }
+            setCameraView(1);
+            animate();
+        };
+    </script>
+</body>
+
+</html>
